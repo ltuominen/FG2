@@ -21,11 +21,20 @@ names(dat) <- gsub('Amy', 'AMY', names(dat))
 # no specifier for lh+rh ROIs 
 names(dat) <- gsub('Comb', '', names(dat), ignore.case = TRUE)
 
-# used ROIs 
-ROI <- c("CAU","THA", "VST", "HIP", "AMY", 
-         "Insula","dmPFC", "PCC","AngularGyrus" )
+stria <- read.csv('~/Documents/Research/FG2/analysis/Cond_striatum_hemi_combined.csv')
+names(stria)[1] <- 'ID'
 
-vars <- c('ID', 'Pers', 'PDI', paste(ROI, '_CSp', sep=''), paste(ROI, '_CSm', sep='')) 
+dat <- merge(x=dat, y=stria, by = 'ID')
+names(dat) <- gsub('executive', 'EXE', names(dat))
+names(dat) <- gsub('limbic', 'LIM', names(dat))
+names(dat) <- gsub('insula', 'INS', names(dat), ignore.case = TRUE)
+names(dat) <- gsub('AngularGyrus', 'ANG', names(dat), ignore.case = TRUE)
+# used ROIs 
+
+ROI <- c("EXE","THA", "LIM", "HIP", "AMY", 
+         "INS","dmPFC", "PCC","ANG" )
+
+vars <- c('ID', 'Pers.x', 'PDI.x', paste(ROI, '_CSp', sep=''), paste(ROI, '_CSm', sep='')) 
 dat <- dat[, vars]
 
 # calculate contrasts 
@@ -64,7 +73,7 @@ plt <- ggplot(pltdat, aes(fill=cond, y=value, x=ROI)) +
         axis.title.y = element_text(size=16, hjust = 0.5 ),
         axis.text.y = element_text(size=12, hjust = 0.5 )) +
   scale_color_manual(values = c("CSp" = "firebrick1", "CSm" = 'dodgerblue2')) +
-  scale_x_discrete(name ="Regions of Interest", limits=ROIs)
+  scale_x_discrete(name ="Regions of Interest")
   
 for (i in seq(pvals)){
   p <- pvals[i]
@@ -126,7 +135,7 @@ for (r in seq(ROI)){
   
   y = dat[[paste(ROI[r], 'contrast', sep= '')]]
   
-plt <- ggplot(data = dat, aes(x = PDI, y = y )) + 
+plt <- ggplot(data = dat, aes(x = PDI.x, y = y )) + 
   geom_point(color='dodgerblue1', shape = 21, size=2)+
   stat_smooth(method=function(formula,data,weights=weight) rlm(formula,
                                                                data,
@@ -145,91 +154,3 @@ jpeg(paste(pltsdir, '/', ROI[r], '_PDI_robust.jpg', sep=''), width = 1200, heigh
 print(plt)
 dev.off()
   }
-
-
-
-##################################################
-# mixed analysis between PDI and all ROIs 
-##################################################
- 
-ROIlmer <- c("CAU", "AMY","HIP", "VST","Insula","dmPFC", "PCC","AngularGyrus" )
-ROIlmer <- paste(ROIlmer, "contrast", sep='')
-
-mixdat <- dat[, c('ID', ROIlmer, 'PDI')]
-mixdat <- melt(mixdat, id.vars = c("ID",'PDI'))
-mixdat$ROI <- gsub('.{8}$', '', mixdat$variable)
-
-m <- lmer(value ~ PDI  + (1|ROI) + (1|ID), 
-          data = mixdat, 
-          REML= FALSE)
-
-anova(m)
-
-
-
-par(mfrow=c(2,2))
-plot(dat$sqrtPDI, dat$LeftAmygdala_CSp, xlab='PDI', ylab='CS+ vs CS- in left amygdala')
-plot(dat$sqrtPDI, dat$RightAmygdala_CSp, xlab='PDI', ylab='CS+ vs CS- in right amygdala')
-plot(dat$sqrtPDI, dat$Amygdala_CSp, xlab='PDI', ylab='CS+ vs CS- in amygdala')
-
-summary(lm(Amygdala_CSp ~ sqrtPDI, data= dat))
-
-s<-summary(lmrob(dat$amy.contrast ~ dat$sqrtPDI))
-
-jpeg('plot_FC_amy_PDI_robust.tiff', width = 1200, height = 1600, res = 300, units = 'px')
-ggplot(data = dat, aes(x = sqrtPDI, y =amy.contrast )) + 
-  geom_point(color='dodgerblue1', shape = 21, size=2)+
-  stat_smooth(method=function(formula,data,weights=weight) rlm(formula,
-                                                               data,
-                                                               weights=weight,
-                                                               method="MM"),
-              fullrange=TRUE)+
-  
-  
-  labs(title ="Amygdala (lh + rh)", x = "Sqrt transformed PDI", y = 'CS+ vs CS- BOLD') +
-  theme(axis.text=element_text(size=16),axis.title=element_text(size=18),
-        plot.title = element_text(hjust = 0.5, size=16),legend.text = element_text(size=14))+
-  annotate('text' , x = 1.5, y = 1, label = 'Robust regression slope \n b = 0.12, t=2.6, p=0.012', size = 4, hjust = 0 )  
-  
-dev.off()
-
-
-
-jpeg('plot_FC_amy_PDI_ols.tiff', width = 1200, height = 1600, res = 300, units = 'px')
-ggplot(data = dat, aes(x = sqrtPDI, y =amy.contrast )) + 
-  geom_point(color='dodgerblue1', shape = 21, size=2)+
-  stat_smooth(method=lm,
-              fullrange=TRUE)+
-  
-  
-  labs(title ="Amygdala (lh + rh)", x = "Sqrt transformed PDI", y = 'CS+ vs CS- BOLD') +
-  theme(axis.text=element_text(size=16),axis.title=element_text(size=18),
-        plot.title = element_text(hjust = 0.5, size=16),legend.text = element_text(size=14))+
-  annotate('text' , x = 1.5, y = 1, label = 'OLS regression slope \n b = 0.09, t=1.23, p=0.223', size = 4, hjust = 0 )  
-
-dev.off()
-
-par(mfrow=c(1,1))
-lmmodel <- lm(Amygdala_CSp ~ sqrtPDI, data= dat)
-plot(lmmodel)
-
-outlierTest(lmmodel)
-leveragePlots(lmmodel)
-crPlots(lmmodel)
-
-cutoff <- 4/((nrow(dat)-length(lmmodel$coefficients)-2))
-plot(lmmodel, which=4, cook.levels=cutoff)
-
-
-newdat <- dat[c(-4,-28,-44),]
-m2 <- lm(newdat$amy.contrast~newdat$sqrtPDI) 
-plot(m2)
-cutoff <- 4/((nrow(newdat)-length(m2$coefficients)-2))
-plot(m2, which=4, cook.levels=cutoff)
-
-ndat2 <- dat[c(-4,-28,-44,-53,-5, -1),]
-summary(m2 <- lm(ndat2$amy.contrast ~ ndat2$sqrtPDI) )
-plot(m2)
-
-robmodel <- lmrob(dat$amy.contrast ~ dat$sqrtPDI)
-plot(robmodel)
